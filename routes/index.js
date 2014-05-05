@@ -1,9 +1,8 @@
-var express = require('express');
-var router = express.Router();
+var passport = require('passport');
 
-/* GET home page. */
-router.get('/', function(req, res) {
-  res.render('index', { title: 'Express' });
-});
-
-module.exports = router;
+module.exports = function(app) {
+  app.use(passport.initialize());
+  app.use(passport.session());
+  app.use('/api/auth/', require('./auth'));
+  app.use('/api/days/', require('./days'));
+};
