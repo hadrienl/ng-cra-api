@@ -6,12 +6,12 @@ module.exports = function(passport) {
     function(username, password, done) {
       // Get user with this email
       Users.checkAuth(username, password)
-      .then(function(data) {
-        done(null, data);
-      })
-      .catch(function(err) {
-        done(null, false, { message: err });
-      });
+        .then(function(data) {
+          done(null, data);
+        })
+        .catch(function(err) {
+          done(null, false, { message: err });
+        });
     }
   ));
 
@@ -21,11 +21,11 @@ module.exports = function(passport) {
 
   passport.deserializeUser(function(uid, done) {
     Users.get({uid: uid})
-    .then(function(data) {
-      done(null, data);
-    })
-    .catch(function(err) {
-      done(err);
-    });
+      .then(function(data) {
+        done(null, data);
+      })
+      .catch(function(err) {
+        done(err);
+      });
   });
 };
