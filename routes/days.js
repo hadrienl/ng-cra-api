@@ -3,45 +3,45 @@ var express = require('express'),
     authrequired = require('./authrequired'),
     Days = require('../src/models/days');
 
-function getDays(req, res, next) {
-  var from = req.query.from,
-    to = req.query.to;
+function getDaysFromCurrentMonth(req, res, next) {
+  var now = new Date(),
+    currentmonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  if (!from && !to) {
-    from = new Date();
-    from.setDate(1);
-    to = new Date();
-    to.setDate(1);
-    to.setMonth(from.getMonth() + 1);
-    to = new Date(to - 1000 * 60 * 60 * 24);
-  } else {
-    from = new Date(from);
-    to = new Date(to);
-  }
-
-  if (isNaN(from.getTime())) {
-    return res.json(400, {
-      code: 10001,
-      message: '`from` and `to` must be valid dates'
-    });
-  }
-
-  if (isNaN(to.getTime())) {
-    to = from;
-  }
-
-  Days.query({
-      from: from,
-      to: to
+  Days.get({
+      uid: req.user.uid,
+      month: currentmonth
     })
-  .then(function(data) {
-    res.json(data);
-  })
-  .catch(function(err) {
-    res.json(500, err);
-  });
+    .then(function(data) {
+      res.send(data);
+    })
+    .catch(function(err) {
+      res.send(500, err);
+    });
 }
 
-router.get('/', authrequired, getDays);
+function getDaysFromMonth(req, res, next) {
+  var month = req.params.month;
+
+  if (!month.match(/^[0-9]{4}\-[0-9]{2}$/)) {
+    return res.send(400, 'Wrong date format');
+  }
+
+  month = new Date(month);
+
+  Days.get({
+      uid: req.user.uid,
+      month: month
+    })
+    .then(function(data) {
+      res.send(data);
+    })
+    .catch(function(err) {
+      res.send(500, err);
+    });
+}
+
+
+router.get('/', authrequired, getDaysFromCurrentMonth);
+router.get('/:month', authrequired, getDaysFromMonth);
 
 module.exports = router;

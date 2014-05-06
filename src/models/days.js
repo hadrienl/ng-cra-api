@@ -1,41 +1,50 @@
 var _ = require('lodash'),
+  client = require('../database/redisclient'),
   Q = require('q'),
-  Models = require('./models');
+  Models = require('./models'),
+  A_DAY = 1000 * 60 * 60 * 24;
 
 function Days(config) {
   this.constructor.$_super.apply(this, arguments);
 }
 Models.extend(Days);
 
-var fixtures = [{
-  date: new Date('2014-05-01'),
-  morning: 'ng-cra',
-  afternoot: 'ng-cra'
-}, {
-  date: new Date('2014-05-02'),
-  morning: 'ng-cra',
-  afternoot: 'ng-cra'
-}, {
-  date: new Date('2014-05-03'),
-  morning: 'plm',
-  afternoot: 'plm'
-}, {
-  date: new Date('2014-05-04'),
-  morning: 'plm',
-  afternoot: 'ng-cra'
-}, {
-  date: new Date('2014-05-05'),
-  morning: 'ng-cra',
-  afternoot: 'ng-cra'
-}];
+Days.get = function(config) {
+  var deferred = Q.defer(),
+    days = [],
+    from, to;
 
-Days.query = function(config) {
-  var deferred = Q.defer();
+  config = config || {};
 
-  deferred.resolve(_.filter(fixtures, function(v, k) {
-    return (v.date >= config.from &&
-            v.date <= config.to);
-  }));
+  if (!config.month ||
+      !(config.month instanceof Date)) {
+    throw new Error('config.date must be a valid Date');
+  }
+  from = new Date(config.month);
+  to = new Date(from);
+  to.setMonth(to.getMonth()+1);
+  from = new Date(+from - A_DAY);
+
+  while (from < to) {
+    days.push(new Date(from));
+    from = new Date(+from + A_DAY);
+  }
+
+  Q.all(days.map(function(date) {
+    return Q.ninvoke(client, 'hgetall', 'user:'+config.uid+':day:'+(+date))
+  }))
+    .then(function(data) {
+      var dates = days.map(function(date, k) {
+        var day = new Days(data[k]);
+        day.date = date;
+        return day;
+      });
+      deferred.resolve(dates);
+    })
+    .catch(function(err) {
+      deferred.reject(err);
+    });
+  
 
   return deferred.promise;
 };
