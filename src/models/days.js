@@ -49,4 +49,28 @@ Days.get = function(config) {
   return deferred.promise;
 };
 
+Days.prototype.$save = function() {
+  var deferred = Q.defer(),
+    self = this;
+
+  if (!this.uid) {
+    deferred.reject('uid is mandatory');
+  }
+  if (!this.date) {
+    deferred.reject('date is mandatory');
+  }
+
+  Q.ninvoke(client, 'hmset', 'user:' + this.uid + ':day:' + (+this.date),
+      'morning', this.morning,
+      'afternoon', this.afternoon)
+    .then(function(data) {
+      deferred.resolve(self);
+    })
+    .catch(function(err) {
+      deferred.reject(err);
+    });
+
+  return deferred.promise;
+};
+
 module.exports = Days;
