@@ -50,6 +50,78 @@ function addUser(username, password) {
   return deferred.promise;
 }
 
+function addProject(projectname, clientname) {
+  var deferred = Q.defer(),
+    cid;
+
+  Q.ninvoke(client, 'hget', 'indexes:client:name', clientname)
+    .then(function(data) {
+
+      var deferred = Q.defer();
+
+      if (data) {
+        cid = data;
+        deferred.resolve(cid);
+      } else {
+        Q.ninvoke(client, 'hincrby', 'counters', 'nextCid', 1)
+          .then(function(data) {
+            cid = data;
+            return Q.all([
+              Q.ninvoke(client, 'hset', 'client:' + cid, 'name', clientname),
+              Q.ninvoke(client, 'hset', 'indexes:client:name', clientname, cid)
+            ]);
+          })
+          .then(function(data) {
+            deferred.resolve(cid);
+          });
+      }
+
+      return deferred.promise;
+    })
+    .then(function(data) {
+      var deferred = Q.defer(),
+        pid;
+
+      Q.ninvoke(client, 'hget', 'indexes:project:name', projectname)
+        .then(function(data) {
+          var deferred = Q.defer();
+
+          if (data) {
+            pid = data;
+            deferred.resolve(pid);
+          } else {
+            Q.ninvoke(client, 'hincrby', 'counters', 'nextPid', 1)
+              .then(function(data) {
+                pid = data;
+                return Q.all([
+                  Q.ninvoke(client, 'hset', 'project:' + pid, 'name', projectname),
+                  Q.ninvoke(client, 'hset', 'indexes:project:name', projectname, pid)
+                ]);
+              })
+              .then(function(data) {
+                deferred.resolve(pid);
+              });
+          }
+
+          return deferred.promise;
+        })
+        .finally(function() {
+
+          Q.ninvoke(client, 'hset', 'indexes:client:project', pid, cid)
+            .then(function(data) {
+              deferred.resolve(data);
+            });
+        });
+
+      return deferred.promise;
+    })
+    .finally(function() {
+      deferred.resolve();
+    });
+
+  return deferred.promise;
+}
+
 module.exports = function(db) {
   var deferred = Q.defer();
 
@@ -68,6 +140,25 @@ module.exports = function(db) {
     .then(function(data) {
       return addUser('yann', '7c4a8d09ca3762af61e59520943dc26494f8941b');
     })
+    /**
+     * Projects
+     */
+    .then(function() {
+      return addProject('RTT', 'DocDoku');
+    })
+    .then(function() {
+      return addProject('Congé sans solde', 'DocDoku');
+    })
+    .then(function() {
+      return addProject('Congé conventionné', 'DocDoku');
+    })
+    .then(function() {
+      return addProject('Congé payé', 'DocDoku');
+    })
+    .then(function() {
+      return addProject('Congé Payé anticipé', 'DocDoku');
+    })
+
     .catch(function(err) {
       deferred.reject(err);
     })
