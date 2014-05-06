@@ -19,7 +19,10 @@ app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded());
 app.use(cookieParser());
-app.use(session({ secret: 'keyboard cat' }));
+app.use(session({
+  key: 'ngcra.sid',
+  secret: 'keyboard cat'
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 routes(app);
