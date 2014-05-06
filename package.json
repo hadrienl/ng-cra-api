@@ -17,6 +17,8 @@
     "lodash": "^2.4.1",
     "passport-local": "^1.0.0",
     "q": "^1.0.1",
-    "express-session": "^1.0.4"
+    "express-session": "^1.0.4",
+    "redis": "^0.10.1",
+    "sha1": "^1.1.0"
   }
 }
