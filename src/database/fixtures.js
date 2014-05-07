@@ -94,7 +94,9 @@ function addProject(projectname, clientname) {
               .then(function(data) {
                 pid = data;
                 return Q.all([
-                  Q.ninvoke(client, 'hset', 'project:' + pid, 'name', projectname),
+                  Q.ninvoke(client, 'hmset', 'project:' + pid,
+                    'name', projectname,
+                    'cid', cid),
                   Q.ninvoke(client, 'hset', 'indexes:project:name', projectname, pid)
                 ]);
               })

@@ -72,7 +72,9 @@ function getCid(name) {
             ]);
           })
           .then(function(data) {
-            deferred.resolve(cid);
+            return Q.fcall(function() {
+              return cid;
+            });
           });
       }
 
@@ -106,6 +108,7 @@ Projects.create = function(config) {
   getCid(config.client)
     .then(function(data) {
       cid = data;
+      console.log(cid);
       return Q.ninvoke(client, 'hget', 'indexes:project:name', config.name);
     })
     .then(function(data) {
