@@ -108,15 +108,11 @@ Projects.create = function(config) {
   getCid(config.client)
     .then(function(data) {
       cid = data;
-      console.log(cid);
       return Q.ninvoke(client, 'hget', 'indexes:project:name', config.name);
     })
     .then(function(data) {
       if (data) {
-        return Q.fcall(function() {
-          pid = data;
-          return data;
-        });
+        deferred.reject('Project ' + config.name + ' already exists.');
       } else {
         return Q.ninvoke(client, 'hincrby', 'counters', 'nextPid', 1)
           .then(function(data) {
