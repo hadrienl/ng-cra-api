@@ -9,6 +9,28 @@ function Users(config) {
 }
 Models.extend(Users);
 
+Users.prototype.isAdmin = function() {
+  var deferred = Q.defer();
+
+  Q.ninvoke(client, 'hget', 'indexes:user:admin', this.username)
+    .then(function(data) {
+      deferred.resolve(!!data);
+    })
+    .catch(function(err) {
+      deferred.reject(err);
+    });
+
+  return deferred.promise;
+};
+
+Users.prototype.setAdmin = function(admin) {
+  if (admin) {
+    return Q.ninvoke(client, 'hset', 'indexes:user:admin', this.username, true);
+  } else {
+    return Q.ninvoke(client, 'hdel', 'indexes:user:admin', this.username);
+  }
+};
+
 Users.checkAuth = function(username, password) {
   var deferred = Q.defer(),
     uid;
@@ -50,6 +72,61 @@ Users.get = function(config) {
   } else {
     deferred.reject('Bad params');
   }
+
+  return deferred.promise;
+};
+
+Users.create = function(config) {
+  var deferred = Q.defer(),
+    uid;
+
+  config = config || {};
+
+  if (!config.username) {
+    deferred.reject('Username is mandatory');
+    return deferred.promise;
+  }
+  if (!config.password) {
+    deferred.reject('Password is mandatory');
+    return deferred.promise;
+  }
+
+  Q.ninvoke(client, 'hget', 'indexes:user:username', config.username)
+    .then(function(data) {
+      if (data) {
+        throw new Error('username is not available');
+      }
+
+      return Q.ninvoke(client, 'hincrby', 'counters', 'nextUid', 1);
+    })
+    .then(function(data) {
+      uid = data;
+
+      var args = ['user:'+uid,
+        'username', config.username,
+        'password', sha1(config.password)];
+
+      if (config.firstname) {
+        args.push('firstname');
+        args.push(config.firstname);
+      }
+      if (config.lastname) {
+        args.push('lastname');
+        args.push(config.lastname);
+      }
+
+      return Q.npost(client, 'hmset', args);
+    })
+    .then(function(data) {
+      return Q.ninvoke(client, 'hset', 'indexes:user:username', config.username, uid);
+    })
+    .then(function(data) {
+      config.uid = uid;
+      deferred.resolve(new Users(config));
+    })
+    .catch(function(err) {
+      deferred.reject(err);
+    });
 
   return deferred.promise;
 };
