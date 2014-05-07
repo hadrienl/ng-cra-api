@@ -138,6 +138,9 @@ module.exports = function(db) {
       return addUser('hadrien', '7c4a8d09ca3762af61e59520943dc26494f8941b');
     })
     .then(function(data) {
+      return Q.ninvoke(client, 'hset', 'indexes:user:admin', 1, true);
+    })
+    .then(function(data) {
       return addUser('yann', '7c4a8d09ca3762af61e59520943dc26494f8941b');
     })
     /**

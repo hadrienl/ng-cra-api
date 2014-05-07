@@ -50,4 +50,96 @@ Projects.get = function(config) {
   return deferred.promise;
 };
 
+function getCid(name) {
+  var deferred = Q.defer(),
+    cid;
+
+  Q.ninvoke(client, 'hget', 'indexes:client:name', name)
+    .then(function(data) {
+      var deferred = Q.defer();
+
+      if (data) {
+        return Q.fcall(function() {
+          deferred.resolve(data);
+        });
+      } else {
+        return Q.ninvoke(client, 'hincrby', 'counters', 'nextCid', 1)
+          .then(function(data) {
+            cid = data;
+            return Q.all([
+              Q.ninvoke(client, 'hset', 'client:' + cid, 'name', name),
+              Q.ninvoke(client, 'hset', 'indexes:client:name', name, cid)
+            ]);
+          })
+          .then(function(data) {
+            deferred.resolve(cid);
+          });
+      }
+
+      return deferred.promise;
+    })
+    .then(function(cid) {
+      deferred.resolve(cid);
+    })
+    .catch(function(err) {
+      deferred.reject(err);
+    });
+
+  return deferred.promise;
+}
+
+Projects.create = function(config) {
+  var deferred = Q.defer(),
+    pid, cid;
+
+  config = config || {};
+
+  if (!config.name) {
+    deferred.reject('name is mandatory');
+    return deferred.promise;
+  }
+  if (!config.client) {
+    deferred.reject('client is mandatory');
+    return deferred.promise;
+  }
+
+  getCid(config.client)
+    .then(function(data) {
+      cid = data;
+      return Q.ninvoke(client, 'hget', 'indexes:project:name', config.name);
+    })
+    .then(function(data) {
+      if (data) {
+        return Q.fcall(function() {
+          pid = data;
+          return data;
+        });
+      } else {
+        return Q.ninvoke(client, 'hincrby', 'counters', 'nextPid', 1)
+          .then(function(data) {
+            pid = data;
+
+            return Q.all([
+              Q.ninvoke(client, 'hmset', 'project:' + pid,
+                'name', config.name,
+                'cid', cid
+              ),
+              Q.ninvoke(client, 'hset', 'indexes:project:name', config.name, pid),
+              Q.ninvoke(client, 'hset', 'indexes:client:project', pid, cid)
+            ]);
+          });
+      }
+    })
+    .then(function(data) {
+      config.pid = pid;
+      config.cid = cid;
+      deferred.resolve(config);
+    })
+    .catch(function(err) {
+      deferred.reject(err);
+    });
+
+  return deferred.promise;
+};
+
 module.exports = Projects;

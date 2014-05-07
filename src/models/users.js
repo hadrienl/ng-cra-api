@@ -12,7 +12,7 @@ Models.extend(Users);
 Users.prototype.isAdmin = function() {
   var deferred = Q.defer();
 
-  Q.ninvoke(client, 'hget', 'indexes:user:admin', this.username)
+  Q.ninvoke(client, 'hget', 'indexes:user:admin', this.uid)
     .then(function(data) {
       deferred.resolve(!!data);
     })
@@ -25,9 +25,9 @@ Users.prototype.isAdmin = function() {
 
 Users.prototype.setAdmin = function(admin) {
   if (admin) {
-    return Q.ninvoke(client, 'hset', 'indexes:user:admin', this.username, true);
+    return Q.ninvoke(client, 'hset', 'indexes:user:admin', this.uid, true);
   } else {
-    return Q.ninvoke(client, 'hdel', 'indexes:user:admin', this.username);
+    return Q.ninvoke(client, 'hdel', 'indexes:user:admin', this.uid);
   }
 };
 
