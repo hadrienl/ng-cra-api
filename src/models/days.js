@@ -31,7 +31,7 @@ Days.get = function(config) {
   }
 
   Q.all(days.map(function(date) {
-    return Q.ninvoke(client, 'hgetall', 'user:'+config.uid+':day:'+(+date))
+    return Q.ninvoke(client, 'hgetall', 'user:'+config.uid+':day:'+(+date));
   }))
     .then(function(data) {
       var dates = days.map(function(date, k) {
@@ -44,7 +44,7 @@ Days.get = function(config) {
     .catch(function(err) {
       deferred.reject(err);
     });
-  
+
 
   return deferred.promise;
 };
