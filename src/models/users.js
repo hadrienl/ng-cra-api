@@ -1,5 +1,4 @@
-var _ = require('lodash'),
-  client = require('../database/redisclient'),
+var client = require('../database/redisclient'),
   Q = require('q'),
   Models = require('./models'),
   sha1 = require('sha1');
@@ -9,21 +8,21 @@ function Users(config) {
 }
 Models.extend(Users);
 
-Users.prototype.isAdmin = function() {
+Users.prototype.isAdmin = function () {
   var deferred = Q.defer();
 
   Q.ninvoke(client, 'hget', 'indexes:user:admin', this.uid)
-    .then(function(data) {
+    .then(function (data) {
       deferred.resolve(!!data);
     })
-    .catch(function(err) {
+    .catch(function (err) {
       deferred.reject(err);
     });
 
   return deferred.promise;
 };
 
-Users.prototype.setAdmin = function(admin) {
+Users.prototype.setAdmin = function (admin) {
   if (admin) {
     return Q.ninvoke(client, 'hset', 'indexes:user:admin', this.uid, true);
   } else {
@@ -31,42 +30,46 @@ Users.prototype.setAdmin = function(admin) {
   }
 };
 
-Users.checkAuth = function(username, password) {
+Users.checkAuth = function (username, password) {
   var deferred = Q.defer(),
     uid;
 
   Q.ninvoke(client, 'hget', 'indexes:user:username', username)
-    .then(function(data) {
-      if (!data) throw new Error('User not found');
+    .then(function (data) {
+      if (!data) {
+        throw new Error('User not found');
+      }
 
       uid = data;
 
       return Users.get({uid: uid});
     })
-    .then(function(user) {
-      if (user.password !== sha1(password)) throw new Error('Wrong Password!');
+    .then(function (user) {
+      if (user.password !== sha1(password)) {
+        throw new Error('Wrong Password!');
+      }
 
       deferred.resolve(user);
     })
-    .catch(function(err) {
+    .catch(function (err) {
       deferred.reject(err);
     });
 
   return deferred.promise;
 };
 
-Users.get = function(config) {
+Users.get = function (config) {
   var deferred = Q.defer();
-  
+
   config = config || {};
 
   if (config.uid) {
-    Q.ninvoke(client, 'hgetall', 'user:'+config.uid)
-      .then(function(data) {
+    Q.ninvoke(client, 'hgetall', 'user:' + config.uid)
+      .then(function (data) {
         data.uid = config.uid;
         deferred.resolve(new Users(data));
       })
-      .catch(function(err) {
+      .catch(function (err) {
         deferred.reject(err);
       });
   } else {
@@ -76,7 +79,7 @@ Users.get = function(config) {
   return deferred.promise;
 };
 
-Users.create = function(config) {
+Users.create = function (config) {
   var deferred = Q.defer(),
     uid;
 
@@ -91,18 +94,18 @@ Users.create = function(config) {
     return deferred.promise;
   }
 
-  Q.ninvoke(client, 'hget', 'indexes:user:username', config.username)
-    .then(function(data) {
+  Q.ninvoke(client, 'hexists', 'indexes:user:username', config.username)
+    .then(function (data) {
       if (data) {
         throw new Error('username is not available');
       }
 
       return Q.ninvoke(client, 'hincrby', 'counters', 'nextUid', 1);
     })
-    .then(function(data) {
+    .then(function (data) {
       uid = data;
 
-      var args = ['user:'+uid,
+      var args = ['user:' + uid,
         'username', config.username,
         'password', sha1(config.password)];
 
@@ -117,18 +120,59 @@ Users.create = function(config) {
 
       return Q.npost(client, 'hmset', args);
     })
-    .then(function(data) {
+    .then(function () {
       return Q.ninvoke(client, 'hset', 'indexes:user:username', config.username, uid);
     })
-    .then(function(data) {
+    .then(function () {
       config.uid = uid;
       deferred.resolve(new Users(config));
     })
-    .catch(function(err) {
+    .catch(function (err) {
       deferred.reject(err);
     });
 
   return deferred.promise;
+};
+
+Users.update = function (config) {
+  var promises = [];
+  config = config || {};
+
+  if (config.uid) {
+    if (typeof config.lastname !== 'undefined') {
+      promises.push(Q.ninvoke(client, 'hset', 'user:' + config.uid, 'lastname', config.lastname));
+    }
+    if (typeof config.firstname !== 'undefined') {
+      promises.push(Q.ninvoke(client, 'hset', 'user:' + config.uid, 'firstname', config.firstname));
+    }
+
+    return Users.get({uid: config.uid})
+      .then(function (user) {
+        if (config.username && config.username !== user.username) {
+          Q.ninvoke(client, 'hexists', 'indexes:user:username', config.username)
+            .then(function (exist) {
+              if (!exist) {
+                Q.all([
+                  Q.ninvoke(client, 'hset', 'user:' + config.uid, 'username', config.username),
+                  Q.ninvoke(client, 'hset', 'indexes:user:username', config.username, config.uid),
+                  Q.ninvoke(client, 'hdel', 'indexes:user:username', user.username)
+                ]);
+              }
+            });
+        }
+        if (config.newpassword && user.password === sha1(config.oldpassword)) {
+          Q.ninvoke(client, 'hset', 'user:' + config.uid, 'password', sha1(config.newpassword));
+        }
+      })
+      .all(promises)
+      .catch(function (err) {
+        console.error(err);
+      });
+  } else {
+    var deferred = Q.defer();
+    deferred.reject(new Error('Bad params'));
+    return deferred.promise;
+  }
 };
 
 module.exports = Users;
