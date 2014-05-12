@@ -3,7 +3,38 @@ var client = require('../database/redisclient'),
   Models = require('./models'),
   sha1 = require('sha1');
 
+function setToString(v) {
+  if (v === undefined || v === null) {
+    v = '';
+  } else {
+    v = String(v);
+  }
+  return v;
+}
+
 function Users(config) {
+  var $firstname, $lastname;
+
+  Object.defineProperties(this, {
+    firstname: {
+      enumerable: true,
+      get: function () {
+        return $firstname;
+      },
+      set: function (v) {
+        $firstname = setToString(v);
+      }
+    },
+    lastname: {
+      enumerable: true,
+      get: function () {
+        return $lastname;
+      },
+      set: function (v) {
+        $lastname = setToString(v);
+      }
+    }
+  });
   this.constructor.$_super.apply(this, arguments);
 }
 Models.extend(Users);
@@ -135,44 +166,70 @@ Users.create = function (config) {
 };
 
 Users.update = function (config) {
-  var promises = [];
+  var user;
+
   config = config || {};
 
-  if (config.uid) {
-    if (typeof config.lastname !== 'undefined') {
-      promises.push(Q.ninvoke(client, 'hset', 'user:' + config.uid, 'lastname', config.lastname));
+  return Q.fcall(function () {
+    if (!config.uid) {
+      throw new Error('Cannot update user who does not exist in database');
     }
-    if (typeof config.firstname !== 'undefined') {
-      promises.push(Q.ninvoke(client, 'hset', 'user:' + config.uid, 'firstname', config.firstname));
+    else {
+      return null;
     }
+  })
+    .then(function () {
+      return Users.get({uid: config.uid});
+    })
+    .then(function (data) {
+      user = data;
 
-    return Users.get({uid: config.uid})
-      .then(function (user) {
-        if (config.username && config.username !== user.username) {
-          Q.ninvoke(client, 'hexists', 'indexes:user:username', config.username)
-            .then(function (exist) {
-              if (!exist) {
-                Q.all([
-                  Q.ninvoke(client, 'hset', 'user:' + config.uid, 'username', config.username),
-                  Q.ninvoke(client, 'hset', 'indexes:user:username', config.username, config.uid),
-                  Q.ninvoke(client, 'hdel', 'indexes:user:username', user.username)
-                ]);
-              }
-            });
+      return Q.fcall(function () {
+        var args = ['user:' + config.uid];
+
+        if (config.lastname !== user.lastname) {
+          args.push('lastname', config.lastname);
         }
-        if (config.newpassword && user.password === sha1(config.oldpassword)) {
-          Q.ninvoke(client, 'hset', 'user:' + config.uid, 'password', sha1(config.newpassword));
+        if (config.firstname !== user.firstname) {
+          args.push('firstname', config.firstname);
         }
-      })
-      .all(promises)
-      .catch(function (err) {
-        console.error(err);
+        if (args.length === 1) {
+          return null;
+        }
+
+        return Q.npost(client, 'hmset', args);
       });
-  } else {
-    var deferred = Q.defer();
-    deferred.reject(new Error('Bad params'));
-    return deferred.promise;
-  }
+    })
+    .then(function () {
+      if (config.username && config.username !== user.username) {
+        return Users.checkUsername(config.username)
+          .then(function (exist) {
+            if (exist) {
+              return null;
+            }
+
+            return Q.all([
+              Q.ninvoke(client, 'hset', 'user:' + config.uid, 'username', config.username),
+              Q.ninvoke(client, 'hset', 'indexes:user:username', config.username, config.uid),
+              Q.ninvoke(client, 'hdel', 'indexes:user:username', user.username)
+            ]);
+          });
+      }
+      return null;
+    })
+    .then(function () {
+      if (config.newpassword && user.password === sha1(config.oldpassword)) {
+        return Q.ninvoke(client, 'hset', 'user:' + config.uid, 'password', sha1(config.newpassword));
+      }
+      return null;
+    })
+    .then(function () {
+      return 'OK';
+    });
+};
+
+Users.checkUsername = function (username) {
+  return Q.ninvoke(client, 'hexists', 'indexes:user:username', username);
 };
 
 module.exports = Users;
